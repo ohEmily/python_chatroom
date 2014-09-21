@@ -48,7 +48,7 @@ def prompt_login(client):
     return False
 
 def start(argv):
-    server_port = '55555' #int(argv[1])
+    server_port = int(argv[1])
     print 'server started on ' + server_port
     
     sock = socket(AF_INET, SOCK_STREAM)
