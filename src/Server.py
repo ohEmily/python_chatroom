@@ -12,7 +12,15 @@ from sys import argv
 
 BUFF_SIZE = 4096
 IP_ADDR = '127.0.0.1' # localhost
-BACKLOG = 5 
+BACKLOG = 5 # max number of queued connections
+BLOCK_TIME = 6000 # time period IP is blocked after 3 failed logins
+
+# commands supported by the server
+WHO_ELSE_CONNECTED = 'whoelse' # sends names of currently connected users
+WHO_LAST_HOUR = 'wholasthr' # sends names of users connected in last hour
+BROADCAST = 'broadcast' # send message to all connected users
+MESSAGE = 'message' # private message to a user (run 'message <user> <message>')
+LOGOUT = 'logout' # logout this user
 
 def get_logins():
     user_logins = {}
@@ -33,9 +41,9 @@ def prompt_login(client):
         username = client.recv(BUFF_SIZE) # e.g. 'google'
     
         client.send('Please enter your password.')
-        password = client.rev(BUFF_SIZE) # e.g. 'hasglasses' 
+        password = client.recv(BUFF_SIZE) # e.g. 'hasglasses' 
         
-        if (logins[username] == False) or (logins[username] != password):
+        if (not logins[username]) or (logins[username] != password):
             client.send('Login incorrect. Please try again.')
         
         elif (logins[username]) and (logins[username] == password):
@@ -49,17 +57,20 @@ def prompt_login(client):
 
 def start(argv):
     server_port = int(argv[1])
-    print 'server started on ' + server_port
     
     sock = socket(AF_INET, SOCK_STREAM)
     sock.bind((IP_ADDR,server_port))
     sock.listen(BACKLOG)
+    print 'Server Listening on port ' + str(server_port) + '...'
     
     while(1):
       client_connection, addr = sock.accept()
+      client_connection.recv(BUFF_SIZE)
       prompt_login(client_connection)
       
-      client_connection.close()
+      print('Client connected from IP ' + str(addr) + '.')
+      
+      # client_connection.close()
       
     sock.close()
 

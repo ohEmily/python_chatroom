@@ -13,13 +13,14 @@ from sys import argv
 BUFF_SIZE = 4096
 
 def start(argv):
-    server_IP_addr = int(argv[1])
+    server_IP_addr = argv[1]
     server_port = int(argv[2])
     
     sock = socket(AF_INET, SOCK_STREAM)
     sock.connect((server_IP_addr,server_port))
     
-     
+    print repr(sock.recv(BUFF_SIZE))
+    
     # sock.close()
 
 # main
