@@ -25,17 +25,11 @@ BROADCAST = 'broadcast' # send message to all connected users
 MESSAGE = 'message' # private message to a user (run 'message <user> <message>')
 LOGOUT = 'logout' # logout this user
 
-def get_logins():
-    user_logins = {}
-    aFile = open("../user_pass.txt")
-    
-    for line in aFile:
-        (key, val) = line.split()
-        user_logins[key] = val
+# global variabless
+logged_in_users = []
 
-    aFile.close()
-    return user_logins
-
+# Return true or false depending on whether the user logs in or not.
+# If user fails password 3 times for same username, block them for 60 seconds.
 def prompt_login(client):
     login_attempt_count = 0 
     
@@ -64,18 +58,17 @@ def prompt_commands(client):
         command = client.recv(BUFF_SIZE)
         
         if (command == WHO_ELSE_CONNECTED):
-            print "Command: " + WHO_ELSE_CONNECTED
+            client.sendall("Command: " + WHO_ELSE_CONNECTED)
         elif (command == WHO_LAST_HOUR):
-            print "Command: " + WHO_LAST_HOUR
+            client.sendall("Command: " + WHO_LAST_HOUR)
         elif (command == BROADCAST):
-            print "Command: " + BROADCAST
+            client.sendall("Command: " + BROADCAST)
         elif (command == MESSAGE):
-            print "Command: " + MESSAGE
+            client.sendall("Command: " + MESSAGE)
         elif (command == LOGOUT):
-            print "Command: " + LOGOUT
+            client.sendall("Command: " + LOGOUT)
         else:
-            print 'Command not found.'
-        
+            client.sendall('Command not found.')
 
 def handle_client(client_sock, addr):
     print "New thread: " + str(current_thread())
@@ -83,7 +76,7 @@ def handle_client(client_sock, addr):
     if (prompt_login(client_sock)):
         stdout.flush()
         print 'Successfully logged in user'
-        stdout.flush()
+        prompt_commands(client_sock)
     else:
         print 'User failed login.'
         client_sock.close()
@@ -103,9 +96,18 @@ def start(argv):
         
         thread = Thread(target=handle_client, args=(client_connection, addr))
         thread.start()
-      
-    sock.close()
+
+def populate_logins_dictionary():
+    user_logins = {}
+    aFile = open("../user_pass.txt")
+    
+    for line in aFile:
+        (key, val) = line.split()
+        user_logins[key] = val
+
+    aFile.close()
+    return user_logins
 
 # main
-logins = get_logins()
+logins = populate_logins_dictionary()
 start(argv)

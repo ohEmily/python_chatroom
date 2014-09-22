@@ -20,6 +20,11 @@ def send_to_server(sock, server_IP):
     while 1:
         message = raw_input()
         sock.sendall(message)
+        #try:
+        #    message = raw_input()
+        #    sock.sendall(message)
+        #except EOFError: # listens for exiting with ctrl + C
+        #    print '\nClosing connection to server.'
     
 # handles outputting messages from server to stdout. 
 # Runs on its own thread.
