@@ -8,7 +8,10 @@ Run using 'python Server.py <server_port_no>'.
 '''
 
 from socket import *
+import time # for e.g. time.sleep(1)
 from sys import argv
+from sys import stdout
+from threading import Thread, current_thread
 
 BUFF_SIZE = 4096
 IP_ADDR = '127.0.0.1' # localhost
@@ -37,40 +40,69 @@ def prompt_login(client):
     login_attempt_count = 0 
     
     while login_attempt_count < 3:
-        client.send('Please enter your username.')
+        client.sendall('Please enter your username.')
         username = client.recv(BUFF_SIZE) # e.g. 'google'
     
-        client.send('Please enter your password.')
+        client.sendall('Please enter your password.')
         password = client.recv(BUFF_SIZE) # e.g. 'hasglasses' 
         
         if (not logins[username]) or (logins[username] != password):
-            client.send('Login incorrect. Please try again.')
+            client.sendall('Login incorrect. Please try again.')
         
         elif (logins[username]) and (logins[username] == password):
-            client.send('Login successful. Welcome!')
+            client.sendall('Login successful. Welcome!')
             return True
         
         login_attempt_count += 1
         
-    client.send('Login failed too many times. Closing connection.')
+    client.sendall('Login failed too many times. Closing connection.')
     return False
+
+def prompt_commands(client):
+    while 1:
+        client.sendall('Please type a command.')
+        command = client.recv(BUFF_SIZE)
+        
+        if (command == WHO_ELSE_CONNECTED):
+            print "Command: " + WHO_ELSE_CONNECTED
+        elif (command == WHO_LAST_HOUR):
+            print "Command: " + WHO_LAST_HOUR
+        elif (command == BROADCAST):
+            print "Command: " + BROADCAST
+        elif (command == MESSAGE):
+            print "Command: " + MESSAGE
+        elif (command == LOGOUT):
+            print "Command: " + LOGOUT
+        else:
+            print 'Command not found.'
+        
+
+def handle_client(client_sock, addr):
+    print "New thread: " + str(current_thread())
+    stdout.flush()
+    if (prompt_login(client_sock)):
+        stdout.flush()
+        print 'Successfully logged in user'
+        stdout.flush()
+    else:
+        print 'User failed login.'
+        client_sock.close()
 
 def start(argv):
     server_port = int(argv[1])
-    
     sock = socket(AF_INET, SOCK_STREAM)
     sock.bind((IP_ADDR,server_port))
     sock.listen(BACKLOG)
-    print 'Server Listening on port ' + str(server_port) + '...'
+    print 'Server main thread: ' + str(current_thread())
+    print "Server Listening on port " + str(server_port) + "...\n"
+    stdout.flush()
     
-    while(1):
-      client_connection, addr = sock.accept()
-      client_connection.recv(BUFF_SIZE)
-      prompt_login(client_connection)
-      
-      print('Client connected from IP ' + str(addr) + '.')
-      
-      # client_connection.close()
+    while 1:
+        client_connection, addr = sock.accept()
+        print "Client connected from IP "  + str(addr) + "."
+        
+        thread = Thread(target=handle_client, args=(client_connection, addr))
+        thread.start()
       
     sock.close()
 

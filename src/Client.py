@@ -9,8 +9,26 @@ Run using 'python Client.py <server_IP_address> <server_port_no>'.
 
 from socket import *
 from sys import argv
+from sys import stdout
+from threading import Thread
 
 BUFF_SIZE = 4096
+
+# handles sending text typed in stdin to server. 
+# Runs on its own thread.
+def send_to_server(sock, server_IP):
+    while 1:
+        message = raw_input()
+        sock.sendall(message)
+    
+# handles outputting messages from server to stdout. 
+# Runs on its own thread.
+def recv_from_server(sock, server_IP):
+    while 1:
+        message = sock.recv(BUFF_SIZE)
+        if len(message) > 0:
+            print message
+        stdout.flush()
 
 def start(argv):
     server_IP_addr = argv[1]
@@ -19,9 +37,10 @@ def start(argv):
     sock = socket(AF_INET, SOCK_STREAM)
     sock.connect((server_IP_addr,server_port))
     
-    print repr(sock.recv(BUFF_SIZE))
-    
-    # sock.close()
-
+    # start threads for sending and receiving
+    send_thread = Thread(target=send_to_server, args=(sock, server_IP_addr))
+    send_thread.start()
+    recv_thread = Thread(target=recv_from_server, args=(sock, server_IP_addr))
+    recv_thread.start()
 # main
 start(argv)
