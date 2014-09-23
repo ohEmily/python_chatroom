@@ -7,7 +7,7 @@ Run using 'python Client.py <server_IP_address> <server_port_no>'.
 @author: Emily Pakulski
 '''
 
-from socket import *
+from socket import socket, AF_INET, SOCK_STREAM
 from sys import argv
 from sys import stdout
 from threading import Thread
@@ -18,13 +18,11 @@ BUFF_SIZE = 4096
 # Runs on its own thread.
 def send_to_server(sock, server_IP):
     while 1:
-        message = raw_input()
-        sock.sendall(message)
-        #try:
-        #    message = raw_input()
-        #    sock.sendall(message)
-        #except EOFError: # listens for exiting with ctrl + C
-        #    print '\nClosing connection to server.'
+        try:
+            message = raw_input()
+            sock.sendall(message)
+        except EOFError: # listens for exiting with ctrl + C
+            print '\nClosing connection to server.'
     
 # handles outputting messages from server to stdout. 
 # Runs on its own thread.
@@ -47,5 +45,6 @@ def start(argv):
     send_thread.start()
     recv_thread = Thread(target=recv_from_server, args=(sock, server_IP_addr))
     recv_thread.start()
+
 # main
 start(argv)
