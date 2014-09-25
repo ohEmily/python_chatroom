@@ -31,8 +31,14 @@ logged_in_users = {}
 
 # COMMAND FUNCTIONS
 # sends names of currently connected users
-def cmd_who_else():
-    return str(logged_in_users.keys());
+def cmd_who_else(sender):
+    other_users = 'Users currently logged in: ' 
+    
+    for user in logged_in_users.keys():
+        if (user != sender):
+            other_users += user + ' '
+    
+    return other_users;
 
 # sends names of users connected in last hour
 #def cmd_who_last_hour():
@@ -41,14 +47,26 @@ def cmd_who_else():
     #    if logged_in_users 
 
 # send message to all users currently logged in
-def cmd_broadcast(message):
+def cmd_broadcast(user, command):
+    message = 'Message to all users from ' + user + ': '
+    
+    for word in command[1:]:
+        message += word + ' '
+
     for key in logged_in_users:
         logged_in_users[key].sendall(message)
 
 # send a private message to a single user
-def cmd_private_message(user, message):
-    if logged_in_users[user]:
-        logged_in_users[user].sendall(message)
+def cmd_private_message(sender, command):
+    message = 'Private message from ' + sender + ': '
+    
+    receiver = command[1]
+    
+    for word in command[2:]:
+        message += word + ' '
+      
+    if logged_in_users[receiver]:
+        logged_in_users[receiver].sendall(message)
 
 # 
 def cmd_logout(client):
@@ -65,22 +83,27 @@ def prompt_commands(client, username):
         command = client.recv(BUFF_SIZE).split()
         
         if (command[0] == WHO_ELSE_CONNECTED):
-            client.sendall('Users currently logged in: ' + cmd_who_else())
+            client.sendall(cmd_who_else(username))
             
         elif (command[0] == WHO_LAST_HOUR): #####################################
             client.sendall("Command: " + WHO_LAST_HOUR)
             
         elif (command[0] == BROADCAST):
-            cmd_broadcast('Message to all users from ' + username + ': ' + command[1:]) # TODO send this and rest of command
+            #cmd_broadcast('Message to all users from ' + username + ': ' + command[2])
+            cmd_broadcast(username, command)
 
         elif (command[0] == MESSAGE):
-            cmd_private_message(command[1], 'Private message from ' + username + ': ' + command[2])
+            cmd_private_message(username, command)
             
         elif (command[0] == LOGOUT):
             cmd_logout(client)
             
         else:
             client.sendall('Command not found.')
+
+def login(client, username):
+    client.sendall('Login successful. Welcome!')
+    logged_in_users[username] = client 
 
 # Return true or false depending on whether the user logs in or not.
 # If user fails password 3 times for same username, block them for 60 seconds.
@@ -100,9 +123,7 @@ def prompt_login(client_port):
             client_port.sendall('Login incorrect. Please try again.')
         
         elif (logins[username]) and (logins[username] == password):
-            stdout.flush()
-            client_port.sendall('Login successful. Welcome!')
-            logged_in_users[username] = client_port
+            login(client_port, username) # CHANGE MADE HERE
             return username
         
         login_attempt_count += 1
@@ -121,7 +142,18 @@ def handle_client(client_sock, addr):
         print 'User failed login.'
         client_sock.close()
 
-def start(argv):
+def populate_logins_dictionary():
+    user_logins = {}
+    aFile = open("../user_pass.txt")
+    
+    for line in aFile:
+        (key, val) = line.split()
+        user_logins[key] = val
+
+    aFile.close()
+    return user_logins
+
+def main(argv):
     server_port = int(argv[1])
     sock = socket(AF_INET, SOCK_STREAM)
     sock.bind((IP_ADDR,server_port))
@@ -137,17 +169,5 @@ def start(argv):
         thread = Thread(target=handle_client, args=(client_connection, addr))
         thread.start()
 
-def populate_logins_dictionary():
-    user_logins = {}
-    aFile = open("../user_pass.txt")
-    
-    for line in aFile:
-        (key, val) = line.split()
-        user_logins[key] = val
-
-    aFile.close()
-    return user_logins
-
-# main
 logins = populate_logins_dictionary()
-start(argv)
+main(argv)

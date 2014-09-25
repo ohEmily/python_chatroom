@@ -33,7 +33,7 @@ def recv_from_server(sock, server_IP):
             print message
         stdout.flush()
 
-def start(argv):
+def main(argv):
     server_IP_addr = argv[1]
     server_port = int(argv[2])
     
@@ -46,5 +46,4 @@ def start(argv):
     recv_thread = Thread(target=recv_from_server, args=(sock, server_IP_addr))
     recv_thread.start()
 
-# main
-start(argv)
+main(argv)
