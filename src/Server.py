@@ -7,6 +7,10 @@ Run using 'python Server.py <server_port_no>'.
 @author: Emily Pakulski
 '''
 
+# TODO: update logged in users when user disconnects
+# TODO: fix login to match assignment exactly
+# TODO: check that user is not already logged in when logging in
+
 from socket import socket, AF_INET, SOCK_STREAM
 import time # for e.g. time.sleep(1)
 from sys import argv
@@ -23,28 +27,38 @@ BLOCK_TIME = 6000 # time period IP is blocked after 3 failed logins
 WHO_ELSE_CONNECTED = 'whoelse'
 WHO_LAST_HOUR = 'wholasthr'
 BROADCAST = 'broadcast' 
-MESSAGE = 'message' # private message to a user (run 'message <user> <message>')
-LOGOUT = 'logout' # logout this user
+MESSAGE = 'message'
+LOGOUT = 'logout' 
 
 # global variables
-logged_in_users = {}
+logged_in_users = [] # list of tuples (username, client_port)
+past_connections = {} # dictionary (key = connection_time, val = client_port)
 
 # COMMAND FUNCTIONS
 # sends names of currently connected users
-def cmd_who_else(sender):
-    other_users = 'Users currently logged in: ' 
+def cmd_who_else(client, sender_username):
+    other_users_list = 'Other users currently logged in: ' 
     
-    for user in logged_in_users.keys():
-        if (user != sender):
-            other_users += user + ' '
+    for user in logged_in_users:
+        if (user[0] != sender_username):
+            other_users_list += user[0] + ' '
     
-    return other_users;
+    client.sendall(other_users_list)
 
 # sends names of users connected in last hour
-#def cmd_who_last_hour():
+def cmd_who_last_hour(client):
     # remove all usernames from over an hour ago
-    #for (username in logged_in_users.keys()):
-    #    if logged_in_users 
+    for time in past_connections:
+        if datetime.datetime.now() - time > datetime.timedelta(hours = 1):
+            past_connections.remove(time)
+    
+    # send back remaining users
+    other_users_list = 'Users who connected in the past hour: ' 
+    
+    for user in past_connections:
+            other_users_list += user[0] + ' '
+    
+    client.sendall(other_users_list)
 
 # send message to all users currently logged in
 def cmd_broadcast(user, command):
@@ -53,43 +67,45 @@ def cmd_broadcast(user, command):
     for word in command[1:]:
         message += word + ' '
 
-    for key in logged_in_users:
-        logged_in_users[key].sendall(message)
+    for user_tuple in logged_in_users:
+        user_tuple[1].sendall(message)
 
-# send a private message to a single user
-def cmd_private_message(sender, command):
-    message = 'Private message from ' + sender + ': '
+# private message to a single user (run 'message <user> <message>')
+def cmd_private_message(sender_username, command):
+    message = 'Private message from ' + sender_username + ': '
     
     receiver = command[1]
     
     for word in command[2:]:
         message += word + ' '
-      
-    if logged_in_users[receiver]:
-        logged_in_users[receiver].sendall(message)
+    
+    for user_tuple in logged_in_users:
+        if user_tuple[0] == receiver:
+            user_tuple[1].sendall(message)
 
-# 
+# notifies users of logout and updates array for logged out users 
 def cmd_logout(client):
     client.sendall('Good bye!')
-    for key in logged_in_users:
-        if logged_in_users[key] == client:
-            del logged_in_users[key]
+    for user in logged_in_users:
+        if user[1] == client:
+            stdout.flush()
+            print 'Client ' + user + ' disconnected.'
+            logged_in_users.remove(user)
     client.close()
 
-# REPL that accepts the defined commands.
+# loop that accepts the defined commands.
 def prompt_commands(client, username):    
     while 1:
         client.sendall('Please type a command.')
         command = client.recv(BUFF_SIZE).split()
         
         if (command[0] == WHO_ELSE_CONNECTED):
-            client.sendall(cmd_who_else(username))
+            cmd_who_else(client, username)
             
-        elif (command[0] == WHO_LAST_HOUR): #####################################
-            client.sendall("Command: " + WHO_LAST_HOUR)
+        elif (command[0] == WHO_LAST_HOUR):
+            cmd_who_last_hour(client)
             
         elif (command[0] == BROADCAST):
-            #cmd_broadcast('Message to all users from ' + username + ': ' + command[2])
             cmd_broadcast(username, command)
 
         elif (command[0] == MESSAGE):
@@ -103,7 +119,8 @@ def prompt_commands(client, username):
 
 def login(client, username):
     client.sendall('Login successful. Welcome!')
-    logged_in_users[username] = client 
+    logged_in_users.append((username, client))
+    past_connections[datetime.datetime.now()] = username 
 
 # Return true or false depending on whether the user logs in or not.
 # If user fails password 3 times for same username, block them for 60 seconds.
@@ -133,13 +150,12 @@ def prompt_login(client_port):
 
 def handle_client(client_sock, addr):
     stdout.flush()
-    print "New thread: " + str(current_thread())
+    print "New thread: " + str(current_thread()) # log new threads on server
     
     user_login = prompt_login(client_sock)
     if (user_login):
         prompt_commands(client_sock, user_login)
     else:
-        print 'User failed login.'
         client_sock.close()
 
 def populate_logins_dictionary():
