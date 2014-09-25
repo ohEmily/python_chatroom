@@ -1,11 +1,11 @@
 Client-Server Messaging App (Python)
-------------------------------------
+====================================
 An exercise in socket programming and multithreading in Python.
 
-A simple app that creates a chat room for logged in users. User authentication reads from a pre-defined list of usernames and allows or disallows a login. Logged in users can private message and broadcast.
+A simple app that creates a chat room for users. Users can log in and out, send private messages, broadcast messages to the whole room, check who else is online, and check who was logged in over the past 60 minutes. User authentication reads from a pre-defined text file containing username and password combinations and allows or disallows a login.
 
 How to run
-==========
+----------
 Server:
 ```
 'python Server.py <server_port_no>'
