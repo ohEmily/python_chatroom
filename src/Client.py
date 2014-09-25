@@ -1,6 +1,7 @@
 '''
-Client. Should manage authentication, protection against consecutive failed 
-logins, and multiple clients.
+Client. Supports 2 threads -- one for sending, one for receiving.
+Intentionally kept as simple as possible in order to push computationally
+expensive operations to the server.
 
 Run using 'python Client.py <server_IP_address> <server_port_no>'.
 
@@ -14,8 +15,7 @@ from threading import Thread
 
 BUFF_SIZE = 4096
 
-# handles sending text typed in stdin to server. 
-# Runs on its own thread.
+# Handles sending text from stdin to server. Runs on its own thread.
 def send_to_server(sock, server_IP):
     while 1:
         try:
@@ -24,8 +24,7 @@ def send_to_server(sock, server_IP):
         except EOFError: # listens for exiting with ctrl + C
             print '\nClosing connection to server.'
     
-# handles outputting messages from server to stdout. 
-# Runs on its own thread.
+# Handles outputting messages from server to stdout. Runs on its own thread.
 def recv_from_server(sock, server_IP):
     while 1:
         message = sock.recv(BUFF_SIZE)
@@ -33,6 +32,7 @@ def recv_from_server(sock, server_IP):
             print message
         stdout.flush()
 
+# Connects to server socket and starts send and receive threads.
 def main(argv):
     server_IP_addr = argv[1]
     server_port = int(argv[2])

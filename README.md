@@ -8,10 +8,10 @@ How to run
 ----------
 Server:
 ```
-'python Server.py <server_port_no>'
+python Server.py <server_port_no>
 ```
 
 Client(s):
 ```
-'python Client.py <server_IP_address> <server_port_no>'
+python Client.py <server_IP_address> <server_port_no>
 ```

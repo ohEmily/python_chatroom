@@ -140,7 +140,7 @@ def prompt_login(client_port):
             client_port.sendall('Login incorrect. Please try again.')
         
         elif (logins[username]) and (logins[username] == password):
-            login(client_port, username) # CHANGE MADE HERE
+            login(client_port, username)
             return username
         
         login_attempt_count += 1
@@ -148,6 +148,8 @@ def prompt_login(client_port):
     client_port.sendall('Login failed too many times. Closing connection.')
     return False
 
+# Logs that there is a new client and prompts for user credentials.
+# If login is successful, allows user to run commands.
 def handle_client(client_sock, addr):
     stdout.flush()
     print "New thread: " + str(current_thread()) # log new threads on server
@@ -158,6 +160,7 @@ def handle_client(client_sock, addr):
     else:
         client_sock.close()
 
+# Reads from text file to create dictionary of username-password combinations.
 def populate_logins_dictionary():
     user_logins = {}
     aFile = open("../user_pass.txt")
@@ -169,6 +172,8 @@ def populate_logins_dictionary():
     aFile.close()
     return user_logins
 
+# Prepares server socket to accept clients, with each client running on a 
+# separate thread.
 def main(argv):
     server_port = int(argv[1])
     sock = socket(AF_INET, SOCK_STREAM)
