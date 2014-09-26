@@ -53,10 +53,10 @@ def cmd_who_last_hour(client):
             past_connections.remove(time)
     
     # send back remaining users
-    other_users_list = 'Users who connected in the past hour: ' 
+    other_users_list = 'Users who connected in the past hour: \n' 
     
-    for user in past_connections:
-            other_users_list += user[0] + ' '
+    for key in past_connections:
+            other_users_list += '\t' + past_connections[key] + ' connected at ' + str(key) + '\n'
     
     client.sendall(other_users_list)
 
