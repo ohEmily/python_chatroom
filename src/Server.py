@@ -16,7 +16,8 @@ import datetime # to recall when a user logged in
 BUFF_SIZE = 4096
 IP_ADDR = '127.0.0.1'
 BACKLOG = 5 # max number of queued connections
-BLOCK_TIME = 60 # time period IP is blocked after 3 failed logins
+BLOCK_TIME = 60 # time period in seconds for IP blocking after 3 failed logins
+TIME_OUT = 30 * 60 # time in seconds after user is logged out due to inactivity
 
 # commands supported by the server
 WHO_ELSE_CONNECTED = 'whoelse'
@@ -46,7 +47,7 @@ def cmd_who_else(client, sender_username):
     client.sendall(other_users_list)
 
 # sends names of users connected in last hour
-def cmd_who_last_hour(client):
+def cmd_who_last_hour(client, username):
     # remove all usernames from over an hour ago
     for time in past_connections:
         if datetime.datetime.now() - time > datetime.timedelta(hours = 1):
@@ -56,7 +57,8 @@ def cmd_who_last_hour(client):
     other_users_list = 'Users who connected in the past hour: \n' 
     
     for key in past_connections:
-        other_users_list += '\t' + past_connections[key] + ' connected at ' + str(key) + '\n'
+        if (key != username):
+            other_users_list += '\t' + past_connections[key] + ' connected at ' + str(key) + '\n'
     
     client.sendall(other_users_list)
 
@@ -84,34 +86,43 @@ def cmd_private_message(sender_username, command):
             user_tuple[1].sendall(message)
 
 # notifies users of logout and updates array for logged out users 
-def cmd_logout(client):
+def cmd_logout(client, username):
     client.sendall('Good bye!' )
-    client_exit(client)
+    client_exit(client, username)
 
 # logs server for client disconnect and performs cleanup operations
-def client_exit(client):
+def client_exit(client, client_identifier):
     for user in logged_in_users:
         if user[1] == client:
             stdout.flush()
-            print "Client on IP and port " + str(client) + " disconnected. "
+            print "Client " + str(client_identifier) + " disconnected. "
             logged_in_users.remove(user)
     client.close()
+
+# called when TIME_OUT elapses while waiting for a user command
+def client_timeout(client, client_identifier):
+    client.sendall('Your session has been timed out due to inactivity.')
+    client_exit(client, client_identifier)
 
 # loop that accepts the defined commands.
 def prompt_commands(client, username):    
     while 1:
         try:
             client.sendall('Please type a command. ')
+            
+            # set timer to logout if user is inactive for 30 min
+            Timer(TIME_OUT, client_timeout, (client, username)).start()
+            
             command = client.recv(BUFF_SIZE).split()
         except: # catch  errno 9 bad file descriptor if client disconnects  
-            cmd_logout(client)
+            cmd_logout(client, username)
             client.close()
         
         if (command[0] == WHO_ELSE_CONNECTED):
             cmd_who_else(client, username)
             
         elif (command[0] == WHO_LAST_HOUR):
-            cmd_who_last_hour(client)
+            cmd_who_last_hour(client, username)
             
         elif (command[0] == BROADCAST):
             cmd_broadcast(username, command)
@@ -120,7 +131,7 @@ def prompt_commands(client, username):
             cmd_private_message(username, command)
             
         elif (command[0] == LOGOUT):
-            cmd_logout(client)
+            cmd_logout(client, username)
             
         else:
             client.sendall('Command not found. ')
@@ -211,7 +222,7 @@ def handle_client(client_sock, client_ip):
                 Timer(BLOCK_TIME, unblock, (client_ip, user_login[1])).start()
     except:
         stdout.flush()
-        client_exit(client_sock)
+        client_exit(client_sock, client_ip)
 
 # Reads from text file to create dictionary of username-password combinations.
 def populate_logins_dictionary():
@@ -232,7 +243,6 @@ def main(argv):
     sock = socket(AF_INET, SOCK_STREAM)
     sock.bind((IP_ADDR,server_port))
     sock.listen(BACKLOG)
-    print 'Server main thread: ' + str(current_thread())
     print "Server Listening on port " + str(server_port) + "...\n"
     stdout.flush()
     
