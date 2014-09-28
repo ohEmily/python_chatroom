@@ -246,12 +246,16 @@ def main(argv):
     print "Server Listening on port " + str(server_port) + "...\n"
     stdout.flush()
     
-    while 1:
-        client_connection, addr = sock.accept()
-        print "Client connected from IP "  + str(addr) + "."
+    try:
+        while 1:
+            client_connection, addr = sock.accept()
+            print "Client connected from IP "  + str(addr) + "."
+            
+            thread = Thread(target=handle_client, args=(client_connection, addr))
+            thread.start()
+    except (KeyboardInterrupt, SystemExit):
+        stdout.flush()
+        print '\nServer shut down. '
         
-        thread = Thread(target=handle_client, args=(client_connection, addr))
-        thread.start()
-
 logins = populate_logins_dictionary()
 main(argv)
