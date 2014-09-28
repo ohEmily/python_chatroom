@@ -10,27 +10,28 @@ Run using 'python Client.py <server_IP_address> <server_port_no>'.
 
 from socket import socket, AF_INET, SOCK_STREAM
 from sys import argv
-from sys import stdout
 from threading import Thread
 
 BUFF_SIZE = 4096
 
 # Handles sending text from stdin to server. Runs on its own thread.
 def send_to_server(sock, server_IP):
-    while 1:
-        try:
+    try:
+        while 1:
             message = raw_input()
             sock.sendall(message)
-        except EOFError: # listens for exiting with ctrl + C
-            print '\nClosing connection to server.'
+    except: # listens for exiting with ctrl + C
+        print '\nConnection to server closed. '
     
 # Handles outputting messages from server to stdout. Runs on its own thread.
 def recv_from_server(sock, server_IP):
-    while 1:
-        message = sock.recv(BUFF_SIZE)
-        if len(message) > 0:
-            print message
-        stdout.flush()
+    try: 
+        while 1:
+            message = sock.recv(BUFF_SIZE)
+            if len(message) > 0:
+                print message
+    except:
+        print '\nConnection to server closed. '
 
 # Connects to server socket and starts send and receive threads.
 def main(argv):

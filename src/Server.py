@@ -7,17 +7,11 @@ Run using 'python Server.py <server_port_no>'.
 @author: Emily Pakulski
 '''
 
-# TODO: update logged in users when user disconnects
-# TODO: fix login to match assignment exactly
-# TODO: check that user is not already logged in when logging in
-
 from socket import socket, AF_INET, SOCK_STREAM
-import time # for e.g. time.sleep(1)
 from sys import argv
 from sys import stdout
 from threading import Thread, current_thread, Timer
 import datetime # to recall when a user logged in
-from collections import defaultdict # for keys mapped to lists
 
 BUFF_SIZE = 4096
 IP_ADDR = '127.0.0.1'
@@ -32,7 +26,7 @@ MESSAGE = 'message'
 LOGOUT = 'logout' 
 
 # global variables
-logged_in_users = [] # list of tuples (username, client_port)
+logged_in_users = [] # list of tuples (username, client_sock)
 past_connections = {} # dictionary (key = connection_time, val = client_port)
 blocked_connections = {} # dictionary (key = IP_addr, val = blocked_usernames)
 
@@ -47,7 +41,7 @@ def cmd_who_else(client, sender_username):
     
     # if nobody else besides this client is logged in, let the client know
     if (len(logged_in_users) < 2): 
-        other_users_list += '[none]'
+        other_users_list += '[none] '
     
     client.sendall(other_users_list)
 
@@ -91,12 +85,16 @@ def cmd_private_message(sender_username, command):
 
 # notifies users of logout and updates array for logged out users 
 def cmd_logout(client):
+    client.sendall('Good bye!' )
+    client_exit(client)
+
+# logs server for client disconnect and performs cleanup operations
+def client_exit(client):
     for user in logged_in_users:
         if user[1] == client:
             stdout.flush()
-            print 'Client ' + user[0] + ' disconnected. '
+            print "Client on IP and port " + str(client) + " disconnected. "
             logged_in_users.remove(user)
-    client.sendall('Good bye!' )
     client.close()
 
 # loop that accepts the defined commands.
@@ -151,32 +149,42 @@ def is_blocked(ip_addr, username):
         return True
     return False
 
+def is_already_logged_in(username):
+    for user in logged_in_users:
+        if user[0] == username:
+            return True
+    return False
+
 # Return true or false depending on whether the user logs in or not.
 # If user fails password 3 times for same username, block them for 60 seconds.
-def prompt_login(client_port, client_ip):
+def prompt_login(client_sock, client_ip):
     username = 'default'
     
-    # loop until user inputs a username that exists before continuing
+    # loop until user inputs a valid username
     while (not username in logins):
-        client_port.sendall('Please enter a valid username. ')
-        username = client_port.recv(BUFF_SIZE) # e.g. 'google'
+        client_sock.sendall('Please enter a valid username. ')
+        username = client_sock.recv(BUFF_SIZE) # e.g. 'google'
     
         if (is_blocked(client_ip, username)):
-            client_port.sendall('Your access to this account is temporarily blocked. ')
+            client_sock.sendall('Your access to this account is temporarily blocked. ')
+            username = 'default'
+        
+        if (is_already_logged_in(username)):
+            client_sock.sendall('This username is already in use. ')
             username = 'default'
     
     # suspend connection if 3 failed attempts. Otherwise login
     login_attempt_count = 0
     while login_attempt_count < 3:
-        client_port.sendall('Please enter your password.')
-        password = client_port.recv(BUFF_SIZE) # e.g. 'hasglasses' 
+        client_sock.sendall('Please enter your password.')
+        password = client_sock.recv(BUFF_SIZE) # e.g. 'hasglasses' 
         
         if (logins[username] != password):
             login_attempt_count += 1
-            client_port.sendall('Login incorrect. Please try again. ')
+            client_sock.sendall('Login incorrect. Please try again. ')
         
         elif (logins[username]) and (logins[username] == password):
-            login(client_port, username)
+            login(client_sock, username)
             return (True, username)
     
     return (False, username)
@@ -201,10 +209,9 @@ def handle_client(client_sock, client_ip):
                 block(client_ip, user_login[1])
                 # set callback to unblock this username after BLOCK_TIME elapses
                 Timer(BLOCK_TIME, unblock, (client_ip, user_login[1])).start()
-                #cmd_logout(client_sock)
     except:
         stdout.flush()
-        print "Client on IP and port " + str(client_ip) + " forced disconnect."
+        client_exit(client_sock)
 
 # Reads from text file to create dictionary of username-password combinations.
 def populate_logins_dictionary():
