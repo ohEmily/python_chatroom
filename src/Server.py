@@ -85,18 +85,18 @@ def cmd_private_message(sender_username, command):
         if user_tuple[0] == receiver:
             user_tuple[1].sendall(message)
 
-# notifies users of logout and updates array for logged out users 
-def cmd_logout(client, username):
+# notifies users of logout and closes socket
+def cmd_logout(client, client_identifier):
     client.sendall('Good bye!' )
-    client_exit(client, username)
+    client.close() # triggers exception that calls client_exit() call in handle_client()
 
 # logs server for client disconnect and performs cleanup operations
 def client_exit(client, client_identifier):
     for user in logged_in_users:
         if user[1] == client:
-            stdout.flush()
-            print "Client " + str(client_identifier) + " disconnected. "
             logged_in_users.remove(user)
+    print "Client on " + str(client_identifier[0]) + ":" + str(client_identifier[1]) + " disconnected. "
+    stdout.flush()
     client.close()
 
 # called when TIME_OUT elapses while waiting for a user command
@@ -105,17 +105,20 @@ def client_timeout(client, client_identifier):
     client_exit(client, client_identifier)
 
 # loop that accepts the defined commands.
-def prompt_commands(client, username):    
+def prompt_commands(client, client_ip_and_port, username):    
     while 1:
         try:
             client.sendall('Please type a command. ')
             
             # set timer to logout if user is inactive for 30 min
-            Timer(TIME_OUT, client_timeout, (client, username)).start()
+            timeout_countdown = Timer(TIME_OUT, client_timeout, (client, client_ip_and_port))
+            timeout_countdown.start()
             
             command = client.recv(BUFF_SIZE).split()
+            timeout_countdown.cancel() # cancel timeout when we pass blocking recv call
+        
         except: # catch  errno 9 bad file descriptor if client disconnects  
-            cmd_logout(client, username)
+            cmd_logout(client, client_ip_and_port)
             client.close()
         
         if (command[0] == WHO_ELSE_CONNECTED):
@@ -131,7 +134,7 @@ def prompt_commands(client, username):
             cmd_private_message(username, command)
             
         elif (command[0] == LOGOUT):
-            cmd_logout(client, username)
+            cmd_logout(client, client_ip_and_port)
             
         else:
             client.sendall('Command not found. ')
@@ -168,7 +171,7 @@ def is_already_logged_in(username):
 
 # Return true or false depending on whether the user logs in or not.
 # If user fails password 3 times for same username, block them for 60 seconds.
-def prompt_login(client_sock, client_ip):
+def prompt_login(client_sock, client_ip_and_port):
     username = 'default'
     
     # loop until user inputs a valid username
@@ -176,7 +179,7 @@ def prompt_login(client_sock, client_ip):
         client_sock.sendall('Please enter a valid username. ')
         username = client_sock.recv(BUFF_SIZE) # e.g. 'google'
     
-        if (is_blocked(client_ip, username)):
+        if (is_blocked(client_ip_and_port, username)):
             client_sock.sendall('Your access to this account is temporarily blocked. ')
             username = 'default'
         
@@ -202,27 +205,25 @@ def prompt_login(client_sock, client_ip):
 
 # Logs that there is a new client and prompts for user credentials.
 # If login is successful, allows user to run commands.
-def handle_client(client_sock, client_ip):
+def handle_client(client_sock, client_ip_and_port):
     # initialize list of usernames that may need to be blocked from this IP
-    blocked_connections[client_ip] = []
+    blocked_connections[client_ip_and_port] = []
     
     try:
         while 1:
-            user_login = prompt_login(client_sock, client_ip)
-            if (user_login[0]):
-                client_sock.sendall('Welcome! ')
-                prompt_commands(client_sock, user_login[1])
+            user_login = prompt_login(client_sock, client_ip_and_port)
+            if (user_login[0]): # login succeeded
+                prompt_commands(client_sock, client_ip_and_port, user_login[1])
                 
-            else:
+            else: # login failed
                 # suspend connection and notify user  
                 client_sock.sendall('Login failed too many times. ' +
                             'Temporarily suspending. ')
-                block(client_ip, user_login[1])
+                block(client_ip_and_port, user_login[1])
                 # set callback to unblock this username after BLOCK_TIME elapses
-                Timer(BLOCK_TIME, unblock, (client_ip, user_login[1])).start()
+                Timer(BLOCK_TIME, unblock, (client_ip_and_port, user_login[1])).start()
     except:
-        stdout.flush()
-        client_exit(client_sock, client_ip)
+        client_exit(client_sock, client_ip_and_port)
 
 # Reads from text file to create dictionary of username-password combinations.
 def populate_logins_dictionary():
@@ -249,8 +250,8 @@ def main(argv):
     try:
         while 1:
             client_connection, addr = sock.accept()
-            print "Client connected from IP "  + str(addr) + "."
-            
+            print "Client connected on "  + str(addr[0]) + ":" + str(addr[1]) + ". "
+            stdout.flush()
             thread = Thread(target=handle_client, args=(client_connection, addr))
             thread.start()
     except (KeyboardInterrupt, SystemExit):

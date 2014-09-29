@@ -30,8 +30,8 @@ def recv_from_server(sock, server_IP):
         while 1:
             message = sock.recv(BUFF_SIZE)
             if len(message) > 0:
-                stdout.flush()
                 print message
+                stdout.flush()
     except: # listens for exiting with ctrl + C
         connected = False
         exit(1)
