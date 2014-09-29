@@ -10,7 +10,7 @@ Run using 'python Server.py <server_port_no>'.
 from socket import socket, AF_INET, SOCK_STREAM
 from sys import argv
 from sys import stdout
-from threading import Thread, current_thread, Timer
+from threading import Thread, Timer
 import datetime # to recall when a user logged in
 
 BUFF_SIZE = 4096
@@ -87,7 +87,7 @@ def cmd_private_message(sender_username, command):
 
 # notifies users of logout and closes socket
 def cmd_logout(client, client_identifier):
-    client.sendall('Good bye!' )
+    client.sendall('Good bye! ')
     client.close() # triggers exception that calls client_exit() call in handle_client()
 
 # logs server for client disconnect and performs cleanup operations
@@ -95,13 +95,13 @@ def client_exit(client, client_identifier):
     for user in logged_in_users:
         if user[1] == client:
             logged_in_users.remove(user)
-    print "Client on " + str(client_identifier[0]) + ":" + str(client_identifier[1]) + " disconnected. "
+    print 'Client on ' + str(client_identifier[0]) + ':' + str(client_identifier[1]) + ' disconnected. '
     stdout.flush()
     client.close()
 
 # called when TIME_OUT elapses while waiting for a user command
 def client_timeout(client, client_identifier):
-    client.sendall('Your session has been timed out due to inactivity.')
+    client.sendall('Your session has been timed out due to inactivity. ')
     client_exit(client, client_identifier)
 
 # loop that accepts the defined commands.
@@ -139,6 +139,7 @@ def prompt_commands(client, client_ip_and_port, username):
         else:
             client.sendall('Command not found. ')
 
+# welcomes user and stores user login
 def login(client, username):
     client.sendall('Login successful. Welcome! ')
     logged_in_users.append((username, client))
@@ -190,7 +191,7 @@ def prompt_login(client_sock, client_ip_and_port):
     # suspend connection if 3 failed attempts. Otherwise login
     login_attempt_count = 0
     while login_attempt_count < 3:
-        client_sock.sendall('Please enter your password.')
+        client_sock.sendall('Please enter your password. ')
         password = client_sock.recv(BUFF_SIZE) # e.g. 'hasglasses' 
         
         if (logins[username] != password):
@@ -228,7 +229,7 @@ def handle_client(client_sock, client_ip_and_port):
 # Reads from text file to create dictionary of username-password combinations.
 def populate_logins_dictionary():
     user_logins = {}
-    aFile = open("../user_pass.txt")
+    aFile = open('../user_pass.txt')
     
     for line in aFile:
         (key, val) = line.split()
@@ -244,13 +245,13 @@ def main(argv):
     sock = socket(AF_INET, SOCK_STREAM)
     sock.bind((IP_ADDR,server_port))
     sock.listen(BACKLOG)
-    print "Server Listening on port " + str(server_port) + "...\n"
+    print 'Server Listening on port ' + str(server_port) + '...\n'
     stdout.flush()
     
     try:
         while 1:
             client_connection, addr = sock.accept()
-            print "Client connected on "  + str(addr[0]) + ":" + str(addr[1]) + ". "
+            print 'Client connected on '  + str(addr[0]) + ':' + str(addr[1]) + '. '
             stdout.flush()
             thread = Thread(target=handle_client, args=(client_connection, addr))
             thread.start()

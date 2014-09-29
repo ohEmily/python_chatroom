@@ -1,7 +1,7 @@
 '''
-Client. Supports 2 threads -- one for sending, one for receiving.
-Intentionally kept as simple as possible in order to push computationally
-expensive operations to the server.
+Client. Runs 2 threads -- one for sending, one for receiving.
+Intentionally kept as simple as possible in order to push logic and 
+computationally expensive operations to the server.
 
 Run using 'python Client.py <server_IP_address> <server_port_no>'.
 
