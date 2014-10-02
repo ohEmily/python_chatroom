@@ -207,6 +207,46 @@ def prompt_login(client_sock, client_ip, client_port):
     
     return (False, username)
 
+# prompts user to see if they'd like to create a new account
+def prompt_create_username(client_sock):
+    client_sock.sendall('Hello! Would you like to create a new user? [Y/n]')
+    response = client_sock.recv(BUFF_SIZE)
+    
+    if (response == 'Y'):
+        created_username = False
+        new_user = ""
+        while (not created_username):
+            client_sock.sendall('Great. Please choose a username. ')
+            new_user = client_sock.recv(BUFF_SIZE)
+            
+            if (len(new_user) < 5 or len(new_user) > 10):
+                client_sock.sendall('Usernames must be between 5 and 10 characters long. ')    
+            #TODO make sure username doesn't already exist
+            elif (new_user in logins):
+                client_sock.sendall('This username already exists!')
+            else:
+                created_username = True
+        
+        new_pass = ""
+        created_password = False
+        while (not created_password):
+            client_sock.sendall('Please type in a secure password. ')
+            new_pass = client_sock.recv(BUFF_SIZE)
+            
+            if (len(new_pass) < 6 or len(new_pass) > 16):
+                client_sock.sendall('Passwords must be between 6 and 16 characters long.')
+            else:
+                created_password = True
+        
+        # write new username and password to file
+        with open('../user_pass.txt', 'a') as aFile:
+            aFile.write('\n' + new_user + ' ' + new_pass)
+        
+        # make new username and password available in current session
+        logins[new_user] = new_pass
+        
+        client_sock.sendall('New user created. Redirecting to login menu...')
+
 # Logs that there is a new client and prompts for user credentials.
 # If login is successful, allows user to run commands.
 def handle_client(client_sock, client_ip_and_port):
@@ -216,6 +256,8 @@ def handle_client(client_sock, client_ip_and_port):
     # initialize list of usernames that may need to be blocked from this IP
     if (not blocked_connections.has_key(client_ip)):
         blocked_connections[client_ip] = []
+    
+    prompt_create_username(client_sock)
     
     try:
         while 1:
@@ -237,13 +279,13 @@ def handle_client(client_sock, client_ip_and_port):
 # Reads from text file to create dictionary of username-password combinations.
 def populate_logins_dictionary():
     user_logins = {}
-    aFile = open('../user_pass.txt')
+    # aFile = open('../user_pass.txt')
     
-    for line in aFile:
-        (key, val) = line.split()
-        user_logins[key] = val
+    with open('../user_pass.txt') as aFile:
+        for line in aFile:
+            (key, val) = line.split()
+            user_logins[key] = val
 
-    aFile.close()
     return user_logins
 
 # Prepares server socket to accept clients, with each client running on a 
