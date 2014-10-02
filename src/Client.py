@@ -14,6 +14,7 @@ from threading import Thread
 
 BUFF_SIZE = 4096
 connected = False
+
 # Handles sending text from stdin to server. Runs on its own thread.
 def send_to_server(sock, server_IP):
     try:
@@ -35,7 +36,6 @@ def recv_from_server(sock, server_IP):
     except: # listens for exiting with ctrl + C
         connected = False
         exit(1)
-        
 
 # Connects to server socket and starts send and receive threads.
 def main(argv):

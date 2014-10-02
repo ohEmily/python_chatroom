@@ -49,16 +49,16 @@ def cmd_who_else(client, sender_username):
 # sends names of users connected in last hour
 def cmd_who_last_hour(client, username):
     # remove all usernames from over an hour ago
-    for time in past_connections:
-        if datetime.datetime.now() - time > datetime.timedelta(hours = 1):
-            past_connections.remove(time)
+    for key in past_connections:
+        if datetime.datetime.now() - past_connections[key] > datetime.timedelta(hours = 1):
+            past_connections.remove(key)
     
     # send back remaining users
     other_users_list = 'Users who connected in the past hour: \n' 
     
     for key in past_connections:
         if (key != username):
-            other_users_list += '\t' + past_connections[key] + ' connected at ' + str(key) + '\n'
+            other_users_list += '\t' + str(key) + ' connected at ' + past_connections[key] + '\n'
     
     client.sendall(other_users_list)
 
@@ -91,18 +91,18 @@ def cmd_logout(client, client_identifier):
     client.close() # triggers exception that calls client_exit() call in handle_client()
 
 # logs server for client disconnect and performs cleanup operations
-def client_exit(client, client_identifier):
+def client_exit(client, client_ip, client_port):
     for user in logged_in_users:
         if user[1] == client:
             logged_in_users.remove(user)
-    print 'Client on ' + str(client_identifier[0]) + ':' + str(client_identifier[1]) + ' disconnected. '
+    print 'Client on ' + client_ip + ':' + client_port + ' disconnected. '
     stdout.flush()
     client.close()
 
 # called when TIME_OUT elapses while waiting for a user command
 def client_timeout(client, client_identifier):
     client.sendall('Your session has been timed out due to inactivity. ')
-    client_exit(client, client_identifier)
+    client.close()
 
 # loop that accepts the defined commands.
 def prompt_commands(client, client_ip_and_port, username):    
@@ -116,8 +116,9 @@ def prompt_commands(client, client_ip_and_port, username):
             
             command = client.recv(BUFF_SIZE).split()
             timeout_countdown.cancel() # cancel timeout when we pass blocking recv call
+            past_connections[username] = datetime.datetime.now() # log the user's latest activity
         
-        except: # catch  errno 9 bad file descriptor if client disconnects  
+        except: # catch  er89 rno 9 bad file descriptor if client disconnects  
             cmd_logout(client, client_ip_and_port)
             client.close()
         
@@ -143,15 +144,17 @@ def prompt_commands(client, client_ip_and_port, username):
 def login(client, username):
     client.sendall('Login successful. Welcome! ')
     logged_in_users.append((username, client))
-    past_connections[datetime.datetime.now()] = username 
+    past_connections[username] = datetime.datetime.now() 
 
 # add the username to the list of blocked usernames for this IP
-def block(ip_addr, username):    
+# and drops the connection
+def block(ip_addr, client_sock, username):    
     list_of_blocked_usernames = blocked_connections[ip_addr]
     list_of_blocked_usernames.append(username)
     blocked_connections[ip_addr] = list_of_blocked_usernames
+    client_sock.close()
 
-# remove the username from thel ist of blocked usernames from this IP
+# remove the username from the list of blocked usernames from this IP
 def unblock(ip_addr, username):
     list_of_blocked_usernames = blocked_connections[ip_addr]
     list_of_blocked_usernames.remove(username)
@@ -172,7 +175,7 @@ def is_already_logged_in(username):
 
 # Return true or false depending on whether the user logs in or not.
 # If user fails password 3 times for same username, block them for 60 seconds.
-def prompt_login(client_sock, client_ip_and_port):
+def prompt_login(client_sock, client_ip, client_port):
     username = 'default'
     
     # loop until user inputs a valid username
@@ -180,7 +183,7 @@ def prompt_login(client_sock, client_ip_and_port):
         client_sock.sendall('Please enter a valid username. ')
         username = client_sock.recv(BUFF_SIZE) # e.g. 'google'
     
-        if (is_blocked(client_ip_and_port, username)):
+        if (is_blocked(client_ip, username)):
             client_sock.sendall('Your access to this account is temporarily blocked. ')
             username = 'default'
         
@@ -207,12 +210,17 @@ def prompt_login(client_sock, client_ip_and_port):
 # Logs that there is a new client and prompts for user credentials.
 # If login is successful, allows user to run commands.
 def handle_client(client_sock, client_ip_and_port):
+    client_ip = client_ip_and_port[0]
+    client_port = client_ip_and_port[1]
+    
     # initialize list of usernames that may need to be blocked from this IP
-    blocked_connections[client_ip_and_port] = []
+    if (not blocked_connections.has_key(client_ip)):
+        blocked_connections[client_ip] = []
     
     try:
         while 1:
-            user_login = prompt_login(client_sock, client_ip_and_port)
+            user_login = prompt_login(client_sock, client_ip, client_port)
+
             if (user_login[0]): # login succeeded
                 prompt_commands(client_sock, client_ip_and_port, user_login[1])
                 
@@ -220,11 +228,11 @@ def handle_client(client_sock, client_ip_and_port):
                 # suspend connection and notify user  
                 client_sock.sendall('Login failed too many times. ' +
                             'Temporarily suspending. ')
-                block(client_ip_and_port, user_login[1])
+                block(client_ip, client_sock, user_login[1])
                 # set callback to unblock this username after BLOCK_TIME elapses
-                Timer(BLOCK_TIME, unblock, (client_ip_and_port, user_login[1])).start()
+                Timer(BLOCK_TIME, unblock, (client_ip, user_login[1])).start()
     except:
-        client_exit(client_sock, client_ip_and_port)
+        client_exit(client_sock, client_ip, client_port)
 
 # Reads from text file to create dictionary of username-password combinations.
 def populate_logins_dictionary():
