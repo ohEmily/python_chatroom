@@ -78,10 +78,10 @@ def cmd_who_last_hour(client, username):
     
     # send back remaining users
     other_users_list = 'Users who connected in the past hour: \n' 
-    
+
     for key in past_connections:
         if (key != username):
-            other_users_list += '\t' + str(key) + ' connected at ' + past_connections[key] + '\n'
+            other_users_list += '\t' + str(key) + '\n'
     
     client.sendall(other_users_list)
 
@@ -277,7 +277,7 @@ def prompt_create_username(client_sock):
             
             if (len(new_user) < 5 or len(new_user) > 10):
                 client_sock.sendall('Usernames must be between 5 and 10 characters long. ')    
-            #TODO make sure username doesn't already exist
+            
             elif (new_user in logins):
                 client_sock.sendall('This username already exists!')
             else:
@@ -335,8 +335,7 @@ def handle_client(client_sock, client_ip_and_port):
 # Reads from text file to create dictionary of username-password combinations
 def populate_logins_dictionaries():
     user_logins = {}
-    # aFile = open('../user_pass.txt')
-    
+
     with open('../user_pass.txt') as aFile:
         for line in aFile:
             (key, val) = line.split()
