@@ -1,6 +1,6 @@
 '''
 Server. Should manage authentication, protection against consecutive failed 
-logins, and multiple clients.
+logins, and multiple clients. 
 
 Run using 'python Server.py <server_port_no>'.
 
@@ -14,6 +14,7 @@ from threading import Thread, Timer
 import datetime # to recall when a user logged in
 
 BUFF_SIZE = 4096
+OFFLINE_MSG_SIZE = 256
 IP_ADDR = '127.0.0.1'
 BACKLOG = 5 # max number of queued connections
 BLOCK_TIME = 60 # time period in seconds for IP blocking after 3 failed logins
@@ -25,11 +26,14 @@ WHO_LAST_HOUR = 'wholasthr'
 BROADCAST = 'broadcast' 
 MESSAGE = 'message'
 LOGOUT = 'logout' 
+SET_OFFLINE_MSG = 'setawaymsg'
+CHECK_OFFLINE_MSG = 'seeawaymsg'
 
 # global variables
 logged_in_users = [] # list of tuples (username, client_sock)
 past_connections = {} # dictionary (key = connection_time, val = client_port)
 blocked_connections = {} # dictionary (key = IP_addr, val = blocked_usernames)
+offline_messages = {} # dictionary (key = username, val = away message)
 
 # COMMAND FUNCTIONS
 # sends names of currently connected users
@@ -73,7 +77,7 @@ def cmd_broadcast(user, command):
         user_tuple[1].sendall(message)
 
 # private message to a single user (run 'message <user> <message>')
-def cmd_private_message(sender_username, command):
+def cmd_private_message(sender_username, client, command):
     message = 'Private message from ' + sender_username + ': '
     
     receiver = command[1]
@@ -81,12 +85,34 @@ def cmd_private_message(sender_username, command):
     for word in command[2:]:
         message += word + ' '
     
+    receiver_is_logged_in = False
     for user_tuple in logged_in_users:
         if user_tuple[0] == receiver:
             user_tuple[1].sendall(message)
+            receiver_is_logged_in = True
+    
+    if (not receiver_is_logged_in):
+        client.sendall(receiver + ' is not logged in. ')
+        client.sendall('Away message: ' + offline_messages[sender_username])   
+
+# allows user to set an offline message that is shown when another user 
+# PMs them but they're not online
+def cmd_set_offline_message(client, username):
+    client.sendall('Please enter your away message (max 256 characters).')
+    offline_msg = client.recv(OFFLINE_MSG_SIZE)
+    
+    offline_messages[username] = offline_msg
+
+def cmd_see_offline_message(client, username):
+    text = 'Your away message: '
+    
+    if (offline_messages.has_key(username)):
+        client.sendall(text + offline_messages[username])
+    else:
+        client.sendall(text + '[no message set]')
 
 # notifies users of logout and closes socket
-def cmd_logout(client, client_identifier):
+def cmd_logout(client):
     client.sendall('Good bye! ')
     client.close() # triggers exception that calls client_exit() call in handle_client()
 
@@ -119,7 +145,7 @@ def prompt_commands(client, client_ip_and_port, username):
             past_connections[username] = datetime.datetime.now() # log the user's latest activity
         
         except: # catch  er89 rno 9 bad file descriptor if client disconnects  
-            cmd_logout(client, client_ip_and_port)
+            cmd_logout(client)
             client.close()
         
         if (command[0] == WHO_ELSE_CONNECTED):
@@ -132,10 +158,16 @@ def prompt_commands(client, client_ip_and_port, username):
             cmd_broadcast(username, command)
 
         elif (command[0] == MESSAGE):
-            cmd_private_message(username, command)
-            
+            cmd_private_message(username, client, command)
+        
+        elif(command[0] == CHECK_OFFLINE_MSG):
+            cmd_see_offline_message(client, username)
+        
+        elif (command[0] == SET_OFFLINE_MSG):
+            cmd_set_offline_message(client, username)
+             
         elif (command[0] == LOGOUT):
-            cmd_logout(client, client_ip_and_port)
+            cmd_logout(client)
             
         else:
             client.sendall('Command not found. ')
@@ -276,8 +308,8 @@ def handle_client(client_sock, client_ip_and_port):
     except:
         client_exit(client_sock, client_ip, client_port)
 
-# Reads from text file to create dictionary of username-password combinations.
-def populate_logins_dictionary():
+# Reads from text file to create dictionary of username-password combinations
+def populate_logins_dictionaries():
     user_logins = {}
     # aFile = open('../user_pass.txt')
     
@@ -309,5 +341,5 @@ def main(argv):
         stdout.flush()
         print '\nServer shut down. '
         
-logins = populate_logins_dictionary()
+logins = populate_logins_dictionaries()
 main(argv)
