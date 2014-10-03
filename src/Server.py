@@ -21,13 +21,24 @@ BLOCK_TIME = 60 # time period in seconds for IP blocking after 3 failed logins
 TIME_OUT = 30 * 60 # time in seconds after user is logged out due to inactivity
 
 # commands supported by the server
+HELP = 'help'
 WHO_ELSE_CONNECTED = 'whoelse'
 WHO_LAST_HOUR = 'wholasthr'
 BROADCAST = 'broadcast' 
 MESSAGE = 'message'
-LOGOUT = 'logout' 
 SET_OFFLINE_MSG = 'setawaymsg'
 CHECK_OFFLINE_MSG = 'seeawaymsg'
+LOGOUT = 'logout' 
+
+commands_dict = {
+    WHO_ELSE_CONNECTED : 'Display all users currently logged in. ',
+    WHO_LAST_HOUR : 'Display the usernames of all users active within the past hour. ',
+    BROADCAST : 'Send a message to the entire chat room. Type \'broadcast <content>\'',
+    MESSAGE : 'Send a private message to someone. Type \'message <username> <content>\' ',
+    SET_OFFLINE_MSG : 'Set your away message that other users see when you\'re logged off. ',
+    CHECK_OFFLINE_MSG : 'View your away message, if any. ',             
+    LOGOUT : 'Disconnect this session. '
+}
 
 # global variables
 logged_in_users = [] # list of tuples (username, client_sock)
@@ -36,6 +47,14 @@ blocked_connections = {} # dictionary (key = IP_addr, val = blocked_usernames)
 offline_messages = {} # dictionary (key = username, val = away message)
 
 # COMMAND FUNCTIONS
+# sends all the possible commands a user can enter
+def cmd_help(client):
+    text = 'The following commands are available: \n'
+    for key in commands_dict:
+        text += key + ': ' + commands_dict[key] + '\n'
+
+    client.sendall(text)
+
 # sends names of currently connected users
 def cmd_who_else(client, sender_username):
     other_users_list = 'Other users currently logged in: ' 
@@ -93,7 +112,9 @@ def cmd_private_message(sender_username, client, command):
     
     if (not receiver_is_logged_in):
         client.sendall(receiver + ' is not logged in. ')
-        client.sendall('Away message: ' + offline_messages[sender_username])   
+
+        if (offline_messages.has_key(sender_username)):
+            client.sendall('Away message: ' + offline_messages[sender_username])   
 
 # allows user to set an offline message that is shown when another user 
 # PMs them but they're not online
@@ -148,7 +169,10 @@ def prompt_commands(client, client_ip_and_port, username):
             cmd_logout(client)
             client.close()
         
-        if (command[0] == WHO_ELSE_CONNECTED):
+        if (command[0] == HELP):
+            cmd_help(client)
+        
+        elif (command[0] == WHO_ELSE_CONNECTED):
             cmd_who_else(client, username)
             
         elif (command[0] == WHO_LAST_HOUR):
